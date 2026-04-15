@@ -1,0 +1,68 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>鲁本斯管驻波仿真</title>
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+  <div class="app">
+    <header class="topbar">
+      <div>
+        <h1>鲁本斯管驻波可视化仿真</h1>
+        <p>大学生物理实验竞赛 · 声速测量 · 驻波法互动演示</p>
+      </div>
+    </header>
+
+    <main class="workspace">
+      <section class="panel canvas-panel">
+        <div id="canvas-holder"></div>
+
+        <div class="hud">
+          <div class="hud-item">频率：<span id="freqValue">250</span> Hz</div>
+          <div class="hud-item">模态：<span id="modeValue">2</span> 阶</div>
+          <div class="hud-item">共振频率：<span id="resValue">283</span> Hz</div>
+          <div class="hud-item">半波长：<span id="halfLambdaValue">0.60</span> m</div>
+        </div>
+      </section>
+
+      <aside class="panel control-panel">
+        <h2>控制台</h2>
+
+        <div class="control-group">
+          <label for="freqSlider">频率</label>
+          <input id="freqSlider" type="range" min="80" max="900" value="250" step="1" />
+        </div>
+
+        <div class="control-group">
+          <label for="ampSlider">视觉强度</label>
+          <input id="ampSlider" type="range" min="20" max="100" value="72" step="1" />
+        </div>
+
+        <div class="control-group">
+          <label for="modeSlider">模态</label>
+          <input id="modeSlider" type="range" min="1" max="6" value="2" step="1" />
+        </div>
+
+        <div class="button-grid">
+          <button id="snapBtn">一键共振</button>
+          <button id="autoBtn">自动扫频：关</button>
+          <button id="overlayBtn">物理辅助层：开</button>
+          <button id="resetBtn">重置</button>
+        </div>
+
+        <div class="tip-box">
+          <p>推荐演示顺序：</p>
+          <p>1. 先拖动频率，观察火焰变化</p>
+          <p>2. 点击“一键共振”，出现清晰图样</p>
+          <p>3. 讲解时再打开辅助层</p>
+        </div>
+      </aside>
+    </main>
+  </div>
+
+  <script src="p5.min.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>
