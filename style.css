@@ -194,3 +194,75 @@ button:hover {
     grid-template-columns: 1fr;
   }
 }
+/* =========================
+   PPT 内嵌专用模式
+   ========================= */
+
+body.ppt-embed {
+  overflow: hidden;
+}
+
+.ppt-embed .app {
+  min-height: auto;
+  padding: 8px;
+}
+
+.ppt-embed .topbar {
+  display: none;
+}
+
+.ppt-embed .workspace {
+  grid-template-columns: 1.45fr 0.7fr;
+  gap: 10px;
+  align-items: stretch;
+}
+
+.ppt-embed .canvas-panel {
+  padding: 8px;
+  min-height: auto;
+}
+
+.ppt-embed #canvas-holder {
+  height: 480px;
+  border-radius: 14px;
+}
+
+.ppt-embed .hud {
+  grid-template-columns: repeat(4, 1fr);
+  gap: 6px;
+  margin-top: 8px;
+}
+
+.ppt-embed .hud-item {
+  padding: 8px 10px;
+  font-size: 12px;
+}
+
+.ppt-embed .control-panel {
+  padding: 14px;
+}
+
+.ppt-embed .control-panel h2 {
+  margin-top: 0;
+  margin-bottom: 12px;
+  font-size: 20px;
+}
+
+.ppt-embed .control-group {
+  margin-bottom: 14px;
+}
+
+.ppt-embed .control-group label {
+  font-size: 13px;
+  margin-bottom: 6px;
+}
+
+.ppt-embed button {
+  padding: 10px 12px;
+  font-size: 13px;
+  border-radius: 12px;
+}
+
+.ppt-embed .tip-box {
+  display: none;
+}
