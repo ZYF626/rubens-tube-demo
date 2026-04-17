@@ -1,5 +1,6 @@
 // ===============================
 // 鲁本斯管比赛版仿真 - app.js
+// PPT 内嵌优化版：点击“进入仿真”后再真正启动
 // ===============================
 
 // ---------- 一、先拿到 HTML 里的控件 ----------
@@ -17,6 +18,10 @@ const modeValue = document.getElementById("modeValue");
 const resValue = document.getElementById("resValue");
 const halfLambdaValue = document.getElementById("halfLambdaValue");
 
+// 进入仿真封面层
+const enterSimBtn = document.getElementById("enterSimBtn");
+const entryScreen = document.getElementById("entry-screen");
+
 // ---------- 二、整个仿真的“全局状态” ----------
 const state = {
   tubeLength: 1.2,       // 管长（米），这里是演示用参数
@@ -30,31 +35,28 @@ const state = {
   canvasH: 640
 };
 
-// ---------- 三、常用工具函数 ----------
+// ---------- 三、启动控制 ----------
+let hasStarted = false;   // 是否已经点击“进入仿真”
+let canvasReady = false;  // 是否已经真正创建 canvas
 
-// 共振频率：f_n = n * v / (2L)
-// 这是两端封闭/压力驻波可视化里常用的演示关系
+// ---------- 四、常用工具函数 ----------
 function resonanceFrequency(n) {
   return n * state.soundSpeed / (2 * state.tubeLength);
 }
 
-// 半波长：lambda / 2 = L / n
 function halfLambda(n) {
   return state.tubeLength / n;
 }
 
-// 把数值限制在某个范围内
 function clamp(value, min, max) {
   return Math.max(min, Math.min(max, value));
 }
 
-// 让动画“慢慢逼近目标值”，看起来更顺滑
 function smoothApproach(current, target, speed) {
   return current + (target - current) * speed;
 }
 
-// ---------- 四、初始化火焰数组 ----------
-// 这里每一根火焰都记住自己的当前高度、目标高度、相位
+// ---------- 五、初始化火焰数组 ----------
 function initFlames() {
   state.flames = [];
 
@@ -67,7 +69,7 @@ function initFlames() {
   }
 }
 
-// ---------- 五、更新右下角数值 ----------
+// ---------- 六、更新 HUD ----------
 function updateHUD() {
   const f = Number(freqSlider.value);
   const n = Number(modeSlider.value);
@@ -80,7 +82,7 @@ function updateHUD() {
   halfLambdaValue.textContent = hl.toFixed(2);
 }
 
-// ---------- 六、按钮事件 ----------
+// ---------- 七、按钮事件 ----------
 snapBtn.addEventListener("click", () => {
   const n = Number(modeSlider.value);
   const fn = resonanceFrequency(n);
@@ -115,9 +117,20 @@ freqSlider.addEventListener("input", updateHUD);
 ampSlider.addEventListener("input", updateHUD);
 modeSlider.addEventListener("input", updateHUD);
 
-// ---------- 七、p5.js 的 setup ----------
-// setup 只执行一次：创建画布、初始化火焰
+// ---------- 八、p5.js 初始化 ----------
+// 一开始不创建画布，不启动循环
 function setup() {
+  noCanvas();
+  noLoop();
+  updateHUD();
+}
+
+// ---------- 九、点击后真正启动仿真 ----------
+function startRubensSimulation() {
+  if (hasStarted) return;
+
+  hasStarted = true;
+
   const holder = document.getElementById("canvas-holder");
   const rect = holder.getBoundingClientRect();
 
@@ -129,10 +142,37 @@ function setup() {
 
   initFlames();
   updateHUD();
+
+  canvasReady = true;
+  loop();
 }
 
-// ---------- 八、窗口尺寸变化时，自适应 ----------
+// ---------- 十、按钮绑定 ----------
+document.addEventListener("DOMContentLoaded", () => {
+  updateHUD();
+
+  if (enterSimBtn) {
+    enterSimBtn.addEventListener("click", () => {
+      enterSimBtn.disabled = true;
+      enterSimBtn.textContent = "正在进入...";
+
+      requestAnimationFrame(() => {
+        startRubensSimulation();
+
+        setTimeout(() => {
+          if (entryScreen) {
+            entryScreen.classList.add("hide");
+          }
+        }, 120);
+      });
+    });
+  }
+});
+
+// ---------- 十一、窗口尺寸变化 ----------
 function windowResized() {
+  if (!canvasReady) return;
+
   const holder = document.getElementById("canvas-holder");
   const rect = holder.getBoundingClientRect();
 
@@ -142,42 +182,29 @@ function windowResized() {
   resizeCanvas(state.canvasW, state.canvasH);
 }
 
-// ---------- 九、计算某个位置上的“图样强度” ----------
-// 这里我们不做科研级燃烧模拟，而是做比赛展示用的可视化模型。
-// 思路是：频率越接近该模态共振频率，空间图样越清晰；离得远就越平。
+// ---------- 十二、计算图样强度 ----------
 function computePatternStrength(xNorm, mode, clarity) {
-  // 压力型空间分布的简化可视化模型
   let basePattern = Math.abs(Math.cos(mode * Math.PI * xNorm));
 
-  // 如果需要把图样反过来，这里只改一行
   if (state.invertPattern) {
     basePattern = 1 - basePattern;
   }
 
-  // clarity 越小，图样越接近平坦；clarity 越大，图样越明显
   const flattened = 0.55;
   return flattened + (basePattern - flattened) * clarity;
 }
 
-// ---------- 十、更新每根火焰的目标高度 ----------
+// ---------- 十三、更新火焰目标高度 ----------
 function updateFlameTargets() {
   const f = Number(freqSlider.value);
   const mode = Number(modeSlider.value);
   const ampLevel = Number(ampSlider.value);
 
   const fn = resonanceFrequency(mode);
-
-  // detune = 当前频率离目标共振频率有多远
   const detune = Math.abs(f - fn);
-
-  // 这里控制“靠近共振时突然变清晰”的感觉
-  // 数字越小，共振吸附越明显；数字越大，容忍范围越宽
   const width = 25 + mode * 5;
-
-  // 用高斯型方式做清晰度
   const clarity = Math.exp(-Math.pow(detune / width, 2));
 
-  // 把滑块数值转成像素高度
   const baseHeight = 38;
   const ampPixels = map(ampLevel, 20, 100, 40, 170);
 
@@ -190,33 +217,30 @@ function updateFlameTargets() {
   }
 }
 
-// ---------- 十一、把当前高度慢慢逼近目标高度 ----------
+// ---------- 十四、平滑动画 ----------
 function animateFlames() {
   for (const flame of state.flames) {
     flame.currentHeight = smoothApproach(flame.currentHeight, flame.targetHeight, 0.09);
   }
 }
 
-// ---------- 十二、画背景 ----------
+// ---------- 十五、画背景 ----------
 function drawBackgroundGlow() {
   background(3, 7, 13);
 
   noStroke();
 
-  // 上方蓝色氛围
   fill(20, 60, 110, 30);
   ellipse(width * 0.5, height * 0.12, width * 0.9, height * 0.35);
 
-  // 中央浅亮区域
   fill(35, 70, 120, 16);
   ellipse(width * 0.5, height * 0.58, width * 0.8, height * 0.7);
 }
 
-// ---------- 十三、画金属管 ----------
+// ---------- 十六、画金属管 ----------
 function drawTube(tubeX, tubeY, tubeW, tubeH) {
   const ctx = drawingContext;
 
-  // 管体阴影
   ctx.save();
   ctx.shadowBlur = 24;
   ctx.shadowColor = "rgba(0,0,0,0.55)";
@@ -235,12 +259,10 @@ function drawTube(tubeX, tubeY, tubeW, tubeH) {
 
   ctx.restore();
 
-  // 高光线
   stroke(255, 255, 255, 55);
   strokeWeight(2);
   line(tubeX + 20, tubeY + 12, tubeX + tubeW - 20, tubeY + 12);
 
-  // 底部暗线
   stroke(0, 0, 0, 70);
   strokeWeight(2);
   line(tubeX + 16, tubeY + tubeH - 10, tubeX + tubeW - 16, tubeY + tubeH - 10);
@@ -248,7 +270,7 @@ function drawTube(tubeX, tubeY, tubeW, tubeH) {
   noStroke();
 }
 
-// ---------- 十四、画喷孔 ----------
+// ---------- 十七、画喷孔 ----------
 function drawNozzles(tubeX, tubeY, tubeW) {
   const startX = tubeX + 24;
   const endX = tubeX + tubeW - 24;
@@ -261,19 +283,15 @@ function drawNozzles(tubeX, tubeY, tubeW) {
   }
 }
 
-// ---------- 十五、画单根火焰 ----------
-// 做法：外层大辉光 + 中层橙色 + 内层亮黄
+// ---------- 十八、画单根火焰 ----------
 function drawFlame(x, baseY, flameHeight, idx, timeSec) {
   const flicker =
     Math.sin(timeSec * 8 + idx * 0.35 + state.flames[idx].phase) * 2.8 +
     noise(idx * 0.14, timeSec * 1.8) * 4.0;
 
   const h = Math.max(12, flameHeight + flicker);
-
-  // 火焰宽度随高度略变
   const w = map(h, 20, 220, 6, 14);
 
-  // ---- 外层辉光 ----
   noStroke();
   drawingContext.save();
   drawingContext.shadowBlur = 20;
@@ -285,59 +303,55 @@ function drawFlame(x, baseY, flameHeight, idx, timeSec) {
   bezierVertex(
     x - w * 1.4, baseY - h * 0.30,
     x - w * 1.0, baseY - h * 0.82,
-    x,          baseY - h
+    x, baseY - h
   );
   bezierVertex(
     x + w * 1.0, baseY - h * 0.82,
     x + w * 1.4, baseY - h * 0.30,
-    x,          baseY
+    x, baseY
   );
   endShape(CLOSE);
 
   drawingContext.restore();
 
-  // ---- 中层火焰 ----
   fill(255, 138, 28, 170);
   beginShape();
   vertex(x, baseY);
   bezierVertex(
-    x - w,      baseY - h * 0.28,
+    x - w, baseY - h * 0.28,
     x - w * 0.75, baseY - h * 0.78,
-    x,          baseY - h * 0.96
+    x, baseY - h * 0.96
   );
   bezierVertex(
     x + w * 0.75, baseY - h * 0.78,
-    x + w,      baseY - h * 0.28,
-    x,          baseY
+    x + w, baseY - h * 0.28,
+    x, baseY
   );
   endShape(CLOSE);
 
-  // ---- 内层亮芯 ----
   fill(255, 235, 150, 180);
   beginShape();
   vertex(x, baseY - 2);
   bezierVertex(
     x - w * 0.42, baseY - h * 0.25,
     x - w * 0.22, baseY - h * 0.62,
-    x,            baseY - h * 0.78
+    x, baseY - h * 0.78
   );
   bezierVertex(
     x + w * 0.22, baseY - h * 0.62,
     x + w * 0.42, baseY - h * 0.25,
-    x,            baseY - 2
+    x, baseY - 2
   );
   endShape(CLOSE);
 }
 
-// ---------- 十六、画辅助层 ----------
-// 包括：节点参考线、半波长标尺、文字说明
+// ---------- 十九、画辅助层 ----------
 function drawOverlay(tubeX, tubeY, tubeW, flameBaseY) {
   if (!state.showOverlay) return;
 
   const mode = Number(modeSlider.value);
   const segW = tubeW / mode;
 
-  // 1. 节点参考线（对于当前简化图样而言的最低点位置）
   stroke(110, 190, 255, 120);
   strokeWeight(1.3);
 
@@ -359,7 +373,6 @@ function drawOverlay(tubeX, tubeY, tubeW, flameBaseY) {
     strokeWeight(1.3);
   }
 
-  // 2. 画一个“半波长”标尺
   const arrowY = tubeY - 140;
   const arrowX1 = tubeX;
   const arrowX2 = tubeX + segW;
@@ -368,11 +381,9 @@ function drawOverlay(tubeX, tubeY, tubeW, flameBaseY) {
   strokeWeight(2);
   line(arrowX1, arrowY, arrowX2, arrowY);
 
-  // 左箭头
   line(arrowX1, arrowY, arrowX1 + 10, arrowY - 6);
   line(arrowX1, arrowY, arrowX1 + 10, arrowY + 6);
 
-  // 右箭头
   line(arrowX2, arrowY, arrowX2 - 10, arrowY - 6);
   line(arrowX2, arrowY, arrowX2 - 10, arrowY + 6);
 
@@ -382,7 +393,6 @@ function drawOverlay(tubeX, tubeY, tubeW, flameBaseY) {
   textSize(15);
   text("相邻同类点间距 = λ / 2", (arrowX1 + arrowX2) / 2, arrowY - 16);
 
-  // 3. 说明小字
   fill(180, 205, 240, 200);
   textSize(13);
   text(
@@ -392,16 +402,15 @@ function drawOverlay(tubeX, tubeY, tubeW, flameBaseY) {
   );
 }
 
-// ---------- 十七、主循环 draw ----------
-// draw 每一帧都会执行，负责动画
+// ---------- 二十、主循环 draw ----------
 function draw() {
-  // 自动扫频
+  if (!hasStarted || !canvasReady) return;
+
   if (state.autoSweep) {
     const t = millis() * 0.001;
     const minF = Number(freqSlider.min);
     const maxF = Number(freqSlider.max);
 
-    // 用正弦函数来回扫频
     const autoF = map(Math.sin(t * 0.45), -1, 1, minF, maxF);
     freqSlider.value = Math.round(autoF);
     updateHUD();
@@ -411,15 +420,12 @@ function draw() {
   animateFlames();
   drawBackgroundGlow();
 
-  // ---------- 画布里主要区域参数 ----------
   const tubeW = width * 0.84;
   const tubeH = 54;
   const tubeX = (width - tubeW) / 2;
   const tubeY = height * 0.70;
-
   const flameBaseY = tubeY + 4;
 
-  // ---------- 先画火焰 ----------
   const startX = tubeX + 24;
   const endX = tubeX + tubeW - 24;
   const timeSec = millis() * 0.001;
@@ -429,17 +435,14 @@ function draw() {
     drawFlame(x, flameBaseY, state.flames[i].currentHeight, i, timeSec);
   }
 
-  // ---------- 再画管体和喷孔 ----------
   drawTube(tubeX, tubeY, tubeW, tubeH);
   drawNozzles(tubeX, tubeY, tubeW);
 
-  // ---------- 再画标题说明 ----------
   noStroke();
   fill(220, 235, 255, 220);
   textAlign(CENTER, CENTER);
   textSize(18);
   text("拖动频率，观察驻波图样逐渐出现；点击“一键共振”可快速进入清晰模式", width / 2, height - 26);
 
-  // ---------- 最后画辅助层 ----------
   drawOverlay(tubeX, tubeY, tubeW, flameBaseY);
 }
